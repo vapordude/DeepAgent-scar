@@ -12,7 +12,7 @@ use tracing_subscriber::FmtSubscriber;
 use crate::agent::Agent;
 use crate::config::Config;
 use crate::memory::MemoryManager;
-use crate::tools::{ToolManager, WebSearch, RhaiTool};
+use crate::tools::{ToolManager, WebSearch, RhaiTool, WebPageReader};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -55,6 +55,9 @@ async fn main() -> anyhow::Result<()> {
         let web_search = Box::new(WebSearch::new(serper_key.clone()));
         tools.register(web_search);
     }
+
+    // Register deep research tools
+    tools.register(Box::new(WebPageReader::new()));
 
     // Demonstrate "Evolving and Self-Modifying" via script tool
     let dynamic_script = r#"

@@ -6,6 +6,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use scraper::{Html, Selector};
 
 #[async_trait]
 pub trait Tool: Send + Sync {
@@ -58,6 +59,63 @@ impl Tool for WebSearch {
 
         let body: Value = res.json().await?;
         Ok(body)
+    }
+}
+
+pub struct WebPageReader {
+    client: Client,
+}
+
+impl WebPageReader {
+    pub fn new() -> Self {
+        Self {
+            client: Client::builder()
+                .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .build()
+                .unwrap_or_else(|_| Client::new()),
+        }
+    }
+}
+
+#[async_trait]
+impl Tool for WebPageReader {
+    fn name(&self) -> &str {
+        "web_page_reader"
+    }
+
+    fn description(&self) -> &str {
+        "Reads a web page and extracts its textual content for reasoning-in-documents. Args: {\"url\": \"https://example.com\"}"
+    }
+
+    async fn call(&self, args: Value) -> Result<Value> {
+        let url = args.get("url")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("Missing 'url' string in args"))?;
+
+        let res = self.client.get(url).send().await?;
+
+        if !res.status().is_success() {
+            return Err(anyhow!("Failed to fetch URL: HTTP {}", res.status()));
+        }
+
+        let html = res.text().await?;
+        let document = Html::parse_document(&html);
+
+        let selector = Selector::parse("body").unwrap();
+        let body = document.select(&selector).next().map(|el| el.text().collect::<Vec<_>>().join(" "));
+
+        let content = body.unwrap_or_else(|| "No content found".to_string());
+
+        // Truncate to avoid exploding context window
+        let max_chars = 8000;
+        let content = if content.chars().count() > max_chars {
+            let truncated: String = content.chars().take(max_chars).collect();
+            format!("{}... (truncated)", truncated)
+        } else {
+            content
+        };
+
+        Ok(serde_json::json!({ "content": content }))
     }
 }
 
@@ -132,6 +190,22 @@ impl ToolManager {
 
     pub fn get_tool_names(&self) -> Vec<String> {
         self.tools.keys().cloned().collect()
+    }
+
+    pub fn search_tools(&self, query: &str) -> Vec<Value> {
+        let query = query.to_lowercase();
+        self.tools.values()
+            .filter(|tool| {
+                tool.name().to_lowercase().contains(&query)
+                || tool.description().to_lowercase().contains(&query)
+            })
+            .map(|tool| {
+                serde_json::json!({
+                    "name": tool.name(),
+                    "description": tool.description()
+                })
+            })
+            .collect()
     }
 
     pub async fn call_tool(&self, name: &str, args: Value) -> Result<Value> {
