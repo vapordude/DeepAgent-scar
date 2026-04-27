@@ -1,3 +1,4 @@
+mod env;
 mod agent;
 mod config;
 mod memory;
@@ -12,7 +13,7 @@ use tracing_subscriber::FmtSubscriber;
 use crate::agent::Agent;
 use crate::config::Config;
 use crate::memory::MemoryManager;
-use crate::tools::{ToolManager, WebSearch, RhaiTool};
+use crate::tools::{ToolManager, WebSearch, RhaiTool, PythonExecutor};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -72,6 +73,10 @@ async fn main() -> anyhow::Result<()> {
         dynamic_script
     ));
     tools.register(rhai_tool);
+
+    // Register Python Executor
+    let python_executor = Box::new(PythonExecutor);
+    tools.register(python_executor);
 
     let tools_arc = Arc::new(Mutex::new(tools));
 

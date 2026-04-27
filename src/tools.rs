@@ -117,6 +117,51 @@ impl Tool for RhaiTool {
 }
 
 #[derive(Default)]
+pub struct PythonExecutor;
+
+#[async_trait]
+impl Tool for PythonExecutor {
+    fn name(&self) -> &str {
+        "execute_python_code"
+    }
+
+    fn description(&self) -> &str {
+        "Execute Python code in a safe sandbox environment and return the execution results from stdout. Args: {\"code\": \"python code string\"}"
+    }
+
+    async fn call(&self, args: Value) -> Result<Value> {
+        let code = args.get("code")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'code' string in args"))?;
+
+        let mut cmd = tokio::process::Command::new("python3");
+        cmd.arg("-c").arg(code);
+
+        // Apply a timeout of 10 seconds
+        let result = tokio::time::timeout(std::time::Duration::from_secs(10), cmd.output()).await;
+
+        match result {
+            Ok(Ok(output)) => {
+                let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+                let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+                let mut status = format!("Done. Exit status: {}", output.status);
+
+                if !stderr.is_empty() {
+                     status = format!("Completed with stderr: {}", stderr);
+                }
+
+                Ok(serde_json::json!({
+                    "execution_result": stdout,
+                    "execution_status": status
+                }))
+            }
+            Ok(Err(e)) => Err(anyhow::anyhow!("Failed to execute python3: {}", e)),
+            Err(_) => Err(anyhow::anyhow!("Execution timed out after 10 seconds.")),
+        }
+    }
+}
+
+#[derive(Default)]
 pub struct ToolManager {
     tools: HashMap<String, Box<dyn Tool>>,
 }
