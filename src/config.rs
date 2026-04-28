@@ -3,6 +3,7 @@ use std::fs;
 use std::path::Path;
 
 #[derive(Debug, Deserialize, Clone, Default)]
+#[allow(dead_code)]
 pub struct Config {
     // API Config
     pub toolbench_api: Option<String>,

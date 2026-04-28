@@ -128,7 +128,7 @@ pub struct RhaiTool {
 
 impl RhaiTool {
     pub fn new(name: String, description: String, script: String) -> Self {
-        let mut engine = Engine::new();
+        let engine = Engine::new();
         // Here we could register extra Rust functions into the engine
         // so the script can do complex stuff (like HTTP requests).
         // For now we just use a basic engine.
@@ -188,6 +188,7 @@ impl ToolManager {
         self.tools.insert(tool.name().to_string(), tool);
     }
 
+    #[allow(dead_code)]
     pub fn get_tool_names(&self) -> Vec<String> {
         self.tools.keys().cloned().collect()
     }

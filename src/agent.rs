@@ -137,8 +137,10 @@ You have the following special marker formats available:
                 }
             } else if output_text.contains("[FOLD_THOUGHT]") {
                 info!("Folding thought. Saving state.");
-                let mut store = PersistentStore::default();
-                store.full_context = prompt.clone();
+                let store = PersistentStore {
+                    full_context: prompt.clone(),
+                    ..Default::default()
+                };
                 let mem = self.memory.lock().await;
                 mem.save_memory(&self.session_id, &store)?;
             } else {
@@ -148,8 +150,10 @@ You have the following special marker formats available:
         }
 
         info!("Saving final context.");
-        let mut store = PersistentStore::default();
-        store.full_context = prompt.clone();
+        let store = PersistentStore {
+            full_context: prompt.clone(),
+            ..Default::default()
+        };
         let mem = self.memory.lock().await;
         mem.save_memory(&self.session_id, &store)?;
 
